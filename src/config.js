@@ -19,9 +19,9 @@ export const DEFAULTS = {
   allowSecretPatterns: [],      // regex strings to allowlist
   dryRun: false,
   verbose: false,
-  geminiApiKey: null,           // override GEMINI_API_KEY env var
-  geminiModel: 'gemini-3.5-flash',
+  geminiModel: 'gemini-3.5-flash', // internal fallback — overridden by user's model selection
 };
+
 
 /**
  * Load config from .autogitsyncrc.json in cwd (or a given dir),
@@ -77,7 +77,7 @@ export function loadConfig(cwd = process.cwd(), cliFlags = {}) {
   return merged;
 }
 
-/** Return the default config object as formatted JSON */
+/** Return the default config object as formatted JSON (used by auto-git-sync init) */
 export function defaultConfigJson() {
   return JSON.stringify(
     {
@@ -91,13 +91,14 @@ export function defaultConfigJson() {
       secretScan: true,
       allowSecretPatterns: [],
       dryRun: false,
-      geminiApiKey: null,
-      geminiModel: 'gemini-3.5-flash',
+      // geminiModel is saved here when you run: auto-git-sync model
+      // API key: set via GEMINI_API_KEY env var (never store it in this file)
     },
     null,
     2
   );
 }
+
 
 /** Strip keys whose value is undefined (avoids overwriting file config with CLI non-values) */
 function stripUndefined(obj) {

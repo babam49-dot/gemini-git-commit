@@ -8,7 +8,5 @@
   "commitMessageTemplate": null,
   "secretScan": true,
   "allowSecretPatterns": [],
-  "dryRun": false,
-  "geminiApiKey": null,
-  "geminiModel": "gemini-3.5-flash"
+  "dryRun": false
 }

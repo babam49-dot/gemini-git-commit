@@ -13,8 +13,6 @@ import { assertGitRepo, assertRemote, addAndCommit, getDiff, getChangedFiles, pu
 import { scanFiles } from '../src/secretScan.js';
 import { logger, setVerbose } from '../src/logger.js';
 import {
-  printModelVersion,
-  listModels,
   AVAILABLE_MODELS,
   generateCommitMessage,
 } from '../src/gemini.js';
@@ -280,24 +278,89 @@ program
 // ══════════════════════════════════════════════════════════════════════════════
 program
   .command('model')
-  .description('Show Gemini model information')
-  .option('--show-version', 'Print the current configured Gemini model name and version')
-  .option('--list',         'List all available Gemini models')
-  .action((opts) => {
-    if (opts.list) {
-      listModels();
-      return;
-    }
-
-    // --show-version or bare `model`
+  .description('Interactively select a Gemini model to use for commit messages')
+  .option('--list', 'Just list available models (non-interactive)')
+  .action(async (opts) => {
     const config = loadConfig(process.cwd(), {});
-    printModelVersion(config);
 
-    if (!opts.showVersion && !opts.list) {
-      // Bare `model` — show both
-      listModels();
+    const BLUE   = '\x1b[34m';
+    const CYAN   = '\x1b[36m';
+    const BOLD   = '\x1b[1m';
+    const DIM    = '\x1b[2m';
+    const GREEN  = '\x1b[32m';
+    const YELLOW = '\x1b[33m';
+    const RESET  = '\x1b[0m';
+
+    // ── Current state ─────────────────────────────────────────────────────────
+    const currentModel = config.geminiModel;
+    const apiKey       = process.env.GEMINI_API_KEY || config.geminiApiKey || null;
+
+    console.log();
+    console.log(`${BOLD}  Gemini Model Selector${RESET}`);
+    console.log(`  ${'─'.repeat(50)}`);
+    console.log(`  API Key : ${apiKey
+      ? `${GREEN}✅ Set via GEMINI_API_KEY env var${RESET}`
+      : `${YELLOW}⚠️  Not set — run: export GEMINI_API_KEY="AIza..."${RESET}`
+    }`);
+    console.log(`  Active  : ${CYAN}${BOLD}${currentModel}${RESET}`);
+    console.log();
+
+    // ── Model list ────────────────────────────────────────────────────────────
+    console.log(`${BOLD}  Available Gemini models:${RESET}`);
+    console.log();
+    AVAILABLE_MODELS.forEach((m, i) => {
+      const num    = `${DIM}[${i + 1}]${RESET}`;
+      const active = m.id === currentModel ? ` ${GREEN}← active${RESET}` : '';
+      const name   = `${BLUE}${BOLD}${m.id}${RESET}`;
+      console.log(`    ${num} ${name}${' '.repeat(Math.max(1, 34 - m.id.length))}${DIM}${m.description}${RESET}${active}`);
+    });
+    console.log();
+
+    if (opts.list) return; // non-interactive mode ends here
+
+    // ── Interactive prompt ────────────────────────────────────────────────────
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+    let selected;
+    while (!selected) {
+      const answer = await rl.question(`  Enter model number (1-${AVAILABLE_MODELS.length}), or press Enter to keep current: `);
+      const trimmed = answer.trim();
+
+      if (trimmed === '') {
+        rl.close();
+        console.log(`\n  ${DIM}No change. Keeping:${RESET} ${CYAN}${BOLD}${currentModel}${RESET}\n`);
+        return;
+      }
+
+      const idx = parseInt(trimmed, 10) - 1;
+      if (!isNaN(idx) && idx >= 0 && idx < AVAILABLE_MODELS.length) {
+        selected = AVAILABLE_MODELS[idx];
+      } else {
+        console.log(`\n  ❌ Invalid choice — enter a number between 1 and ${AVAILABLE_MODELS.length}.\n`);
+      }
     }
+    rl.close();
+
+    // ── Save selection to .autogitsyncrc.json ─────────────────────────────────
+    const configPath = path.join(process.cwd(), CONFIG_FILENAME);
+    let fileConfig   = {};
+
+    if (fs.existsSync(configPath)) {
+      try {
+        fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      } catch { /* ignore parse errors, start fresh */ }
+    }
+
+    fileConfig.geminiModel = selected.id;
+    fs.writeFileSync(configPath, JSON.stringify(fileConfig, null, 2) + '\n', 'utf8');
+
+    console.log();
+    console.log(`  ${GREEN}✅ Model updated:${RESET} ${CYAN}${BOLD}${selected.id}${RESET}`);
+    console.log(`  ${DIM}Saved to ${CONFIG_FILENAME}${RESET}`);
+    console.log(`  ${DIM}To switch again at any time, run: auto-git-sync model${RESET}`);
+    console.log();
   });
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // COMMAND: install
