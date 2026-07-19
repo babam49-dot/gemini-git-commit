@@ -108,6 +108,85 @@ program
   });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// COMMAND: commit
+// ══════════════════════════════════════════════════════════════════════════════
+program
+  .command('commit')
+  .description('Track changes, scan for secrets, analyze diff with Gemini, and commit locally (no automatic push)')
+  .option('--api-key <key>',       'Gemini API key (alternative to GEMINI_API_KEY env var)')
+  .option('--no-secret-scan',      'Disable secret scanning')
+  .option('--dry-run',             'Log what would happen without making any actual commit')
+  .option('--verbose',             'Enable verbose/debug output')
+  .action(async (opts) => {
+    const verbose = opts.verbose ?? false;
+    setVerbose(verbose);
+
+    const cliFlags = {
+      secretScan:           opts.secretScan ?? true,
+      dryRun:               opts.dryRun ?? false,
+      verbose,
+      geminiApiKey:         opts.apiKey,
+    };
+
+    const config = loadConfig(process.cwd(), cliFlags);
+
+    // Validate git repository
+    try {
+      await assertGitRepo(config.watchPath);
+    } catch (err) {
+      logger.error(err.message);
+      process.exit(1);
+    }
+
+    // Get modified / untracked files
+    const files = await getChangedFiles(config.watchPath);
+    if (files.length === 0) {
+      logger.info('No changes detected in the workspace — nothing to commit.');
+      return;
+    }
+
+    logger.info(`📁 Tracked changes in ${files.length} file(s)`);
+
+    // Run secret scan if enabled
+    let safeFiles = files;
+    if (config.secretScan) {
+      const result = scanFiles(files, config);
+      safeFiles = result.safeFiles;
+
+      if (result.skippedFiles.length > 0) {
+        logger.warn(`🔐 Skipped ${result.skippedFiles.length} file(s) due to secret scan:`);
+        for (const { file, reason } of result.skippedFiles) {
+          logger.warn(`   ✖ ${path.basename(file)}: ${reason}`);
+        }
+      }
+
+      if (safeFiles.length === 0) {
+        logger.warn('All changed files were skipped — commit aborted.');
+        return;
+      }
+    }
+
+    // Get unified diff for Gemini
+    const diff = await getDiff(config.watchPath, safeFiles);
+
+    // Generate commit message using Gemini
+    logger.info('Analyzing diff with Gemini...');
+    const commitMessage = await generateCommitMessage(diff, config, safeFiles);
+
+    // Commit changes locally
+    try {
+      const sha = await addAndCommit(config.watchPath, safeFiles, commitMessage, config.dryRun);
+      if (!config.dryRun) {
+        logger.success(`📝 Committed locally: [${sha.slice(0, 7)}] ${commitMessage}`);
+        logger.info(`Run 'git push origin ${config.branch}' to push your changes to GitHub when ready.`);
+      }
+    } catch (err) {
+      logger.error(`Commit failed: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+// ══════════════════════════════════════════════════════════════════════════════
 // COMMAND: init
 // ══════════════════════════════════════════════════════════════════════════════
 program
