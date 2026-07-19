@@ -85,10 +85,10 @@ export async function generateCommitMessage(diff, config, files = []) {
   }
 
   // ── API key format sanity check ───────────────────────────────────────────
-  if (!config.geminiApiKey.startsWith('AIza')) {
+  if (!config.geminiApiKey.startsWith('AIza') && !config.geminiApiKey.startsWith('AQ')) {
     logger.warn(
-      '⚠️  Your Gemini API key does not look like a valid AI Studio key.\n' +
-      '      Expected format: AIza... (39 chars)\n' +
+      '⚠️  Your Gemini API key does not look like a valid key.\n' +
+      '      Expected format: AIza... or AQ... \n' +
       '      Got format: ' + config.geminiApiKey.slice(0, 10) + '...\n' +
       '      Get a free key at: https://aistudio.google.com/apikey'
     );
