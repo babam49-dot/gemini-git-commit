@@ -203,3 +203,23 @@ export async function hasChanges(cwd) {
     status.staged.length > 0
   );
 }
+
+/**
+ * Get an array of all changed, untracked, staged, or deleted files.
+ * @param {string} cwd
+ * @returns {Promise<string[]>}
+ */
+export async function getChangedFiles(cwd) {
+  const git = createGit(cwd);
+  const status = await git.status();
+  const files = new Set([
+    ...status.modified,
+    ...status.not_added,
+    ...status.created,
+    ...status.deleted,
+    ...status.staged,
+    ...status.renamed.map(r => typeof r === 'string' ? r : r.to)
+  ]);
+  return Array.from(files).filter(Boolean);
+}
+
