@@ -6,9 +6,10 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 
+import readline from 'readline/promises';
 import { loadConfig, defaultConfigJson, CONFIG_FILENAME } from '../src/config.js';
 import { startWatcher } from '../src/watcher.js';
-import { assertGitRepo, assertRemote, addAndCommit, getDiff, getChangedFiles } from '../src/git.js';
+import { assertGitRepo, assertRemote, addAndCommit, getDiff, getChangedFiles, pushToRemote } from '../src/git.js';
 import { scanFiles } from '../src/secretScan.js';
 import { logger, setVerbose } from '../src/logger.js';
 import {
