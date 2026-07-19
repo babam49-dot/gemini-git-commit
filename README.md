@@ -5,6 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/auto-git-sync?color=blue)](https://www.npmjs.com/package/auto-git-sync)
 [![Node.js](https://img.shields.io/node/v/auto-git-sync)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub](https://img.shields.io/badge/GitHub-babam49--dot%2Fgemini--git--commit-black?logo=github)](https://github.com/babam49-dot/gemini-git-commit)
 
 ---
 

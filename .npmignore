@@ -1,0 +1,19 @@
+# Files excluded from the npm package (but kept in git)
+
+# Dev/test files
+test-gemini.mjs
+*.test.js
+*.spec.js
+
+# Config & secrets
+.autogitsyncrc.json
+
+# Editor & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

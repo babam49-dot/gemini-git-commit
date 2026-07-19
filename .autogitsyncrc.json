@@ -1,0 +1,14 @@
+{
+  "watchPath": ".",
+  "debounceMs": 4000,
+  "branch": "main",
+  "pushMode": "immediate",
+  "pushIntervalMinutes": 10,
+  "ignorePatterns": [],
+  "commitMessageTemplate": null,
+  "secretScan": true,
+  "allowSecretPatterns": [],
+  "dryRun": false,
+  "geminiApiKey": null,
+  "geminiModel": "gemini-3.5-flash"
+}

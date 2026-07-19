@@ -1,0 +1,51 @@
+{
+  "name": "auto-git-sync",
+  "version": "1.0.0",
+  "description": "Watch your project, auto-commit & push to GitHub with Gemini AI-powered commit messages and secret scanning.",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "auto-git-sync": "bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node bin/cli.js start",
+    "lint": "node --check bin/cli.js"
+  },
+  "keywords": [
+    "git",
+    "auto-commit",
+    "auto-push",
+    "watch",
+    "sync",
+    "github",
+    "gemini",
+    "ai",
+    "devtools",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "chokidar": "^3.6.0",
+    "commander": "^12.1.0",
+    "ignore": "^5.3.2",
+    "simple-git": "^3.26.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/babam49-dot/gemini-git-commit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/babam49-dot/gemini-git-commit/issues"
+  },
+  "homepage": "https://github.com/babam49-dot/gemini-git-commit#readme"
+}

@@ -1,0 +1,26 @@
+# Logs and debug output
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node modules (obviously)
+node_modules/
+
+# Build/pack artifacts
+*.tgz
+
+# Dev/test scratch files
+test-gemini.mjs
+
+# Local config (may contain API keys — users create their own with: auto-git-sync init)
+# Uncomment the line below if you don't want to commit your local config:
+# .autogitsyncrc.json
