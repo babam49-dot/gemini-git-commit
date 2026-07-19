@@ -102,6 +102,38 @@ auto-git-sync start --debounce 8000
 
 ---
 
+### `auto-git-sync commit` — Interactive Gemini Commit (Manual)
+
+If you do not want to automatically track, commit, and push files in the background, you can run this command on demand. It will stage all your changes, print a dynamic `Analyzing......` indicator, call Gemini to generate a message, and present you with an interactive selection menu:
+
+```bash
+auto-git-sync commit [options]
+```
+
+#### Interactive Menu Options:
+1. **Commit & Push to GitHub**: Stages, commits locally using the proposed/edited message, and pushes to your configured branch.
+2. **Commit locally only**: Stages and commits locally without pushing to GitHub.
+3. **Edit/change the commit message**: Lets you input a custom commit message before committing.
+4. **Abort**: Cancels the staging and exit.
+
+| Flag | Description |
+|---|---|
+| `--api-key <key>` | Gemini API key (alternative to env var) |
+| `--no-secret-scan` | Disable pre-commit secret safety scanning |
+| `--dry-run` | Preview the generated commit message without making any commit |
+| `--verbose` | Print full debug output |
+
+**Example:**
+```bash
+# Start the interactive commit flow
+auto-git-sync commit
+
+# Preview the generated message
+auto-git-sync commit --dry-run
+```
+
+---
+
 ### `auto-git-sync init` — Create config file
 
 ```bash
@@ -125,16 +157,21 @@ auto-git-sync model --list
 
 **Output example:**
 ```
-  Current Gemini model : gemini-2.0-flash
-  Description          : Fast, efficient — recommended for commit messages
+  Current Gemini model : gemini-3.5-flash
+  Description          : ⚡ Latest & fastest — best for agentic / coding tasks (default)
   API key set          : ✅ yes
 
   Available Gemini models:
 
-    gemini-2.0-flash             Fast, efficient — recommended for commit messages ← default
-    gemini-2.0-flash-lite        Lightest & fastest variant
-    gemini-1.5-flash             Previous generation flash model
-    gemini-1.5-pro               Most capable, slower
+    gemini-3.5-flash             ⚡ Latest & fastest — best for agentic / coding tasks (default) ← default
+    gemini-3.1-pro               🧠 Most capable — complex reasoning, long context
+    gemini-3.1-flash             Fast 3.1 variant — balanced speed & intelligence
+    gemini-3.1-flash-lite        Lightest 3.x model — lowest latency, high volume
+    gemini-2.5-pro               Stable flagship — proven for production environments
+    gemini-2.5-flash             Stable fast variant — reliable & cost-effective
+    gemini-2.5-flash-lite        Lightest 2.5 model
+    gemini-2.0-flash             Previous generation flash (legacy)
+    gemini-2.0-flash-lite        Lightest legacy variant
 ```
 
 ---
@@ -210,7 +247,7 @@ Run `auto-git-sync init` to create this file, then edit as needed:
   "geminiApiKey": null,
 
   // Gemini model to use for commit messages
-  "geminiModel": "gemini-2.0-flash"
+  "geminiModel": "gemini-3.5-flash"
 }
 ```
 
