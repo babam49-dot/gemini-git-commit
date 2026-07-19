@@ -55,19 +55,16 @@ export const AVAILABLE_MODELS = [
   },
 ];
 
-// ─── Prompt template ──────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are a senior software engineer writing git commit messages.
-Given a unified diff of file changes, produce a single concise commit message.
+Given a unified diff of file changes, produce a single concise and highly descriptive commit message summarizing the exact change.
 
 Rules:
-- Use imperative mood (e.g. "Add", "Fix", "Update", not "Added", "Fixed")
-- First line ≤ 72 characters (the subject line)
-- If there are multiple logical changes, mention the most important one first
-- Do NOT add a body, bullet points, or extra explanation — just the subject line
-- Do NOT include quotes around the message
-- Prefix with a fitting emoji:
-  ✨ new feature  🐛 bug fix  📝 docs  ♻️ refactor  🔧 config
-  🗑️ remove  🚀 performance  🔒 security  🧪 tests  📦 dependencies`;
+- Do NOT use any emojis, labels, or prefixes (e.g. do NOT output "feat:", "fix:", "✨", etc.)
+- Start with a capital letter and write a clear, natural English sentence/phrase
+- Be specific and descriptive of what was changed and why (e.g. "Bypass local CORS errors in app.js contact form by mocking API responses" or "Reduce mobile hero name size to 8.5vw to prevent Y clipping")
+- Keep the message concise (aim for under 72 characters) but prioritize clarity and descriptiveness
+- Do NOT add a body, bullet points, markdown formatting, or extra explanation — output ONLY the raw commit message line
+- Do NOT include quotes around the message`;
 
 /**
  * Generate an AI-powered commit message from a unified diff.
@@ -160,20 +157,15 @@ export async function generateCommitMessage(diff, config, files = []) {
  * Format: "auto-sync: updated N files - YYYY-MM-DD HH:MM"
  */
 export function fallbackMessage(files = []) {
-  const count = files.length;
-  const dateStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  const filePart =
-    count > 0
-      ? `updated ${count} file${count !== 1 ? 's' : ''}`
-      : 'changes detected';
+  if (files.length === 0) return 'Update project files';
 
-  // Optionally append file names for small change sets
-  const nameList =
-    count > 0 && count <= 5
-      ? ' (' + files.map((f) => f.split(/[/\\]/).pop()).join(', ') + ')'
-      : '';
+  const names = files.map((f) => f.split(/[/\\]/).pop());
+  const uniqueNames = Array.from(new Set(names));
 
-  return `🔄 auto-sync: ${filePart}${nameList} - ${dateStr}`;
+  if (uniqueNames.length <= 3) {
+    return `Update ${uniqueNames.join(', ')}`;
+  }
+  return `Update ${uniqueNames.slice(0, 3).join(', ')} and ${uniqueNames.length - 3} other files`;
 }
 
 /**

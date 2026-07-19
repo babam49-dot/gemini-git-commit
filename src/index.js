@@ -9,3 +9,4 @@ export { logger, setVerbose } from './logger.js';
 
 // Helper version export to test file watching
 export const VERSION = '1.0.0';
+// Testing interactive commit subcommand
