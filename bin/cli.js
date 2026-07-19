@@ -171,19 +171,82 @@ program
     const diff = await getDiff(config.watchPath, safeFiles);
 
     // Generate commit message using Gemini
-    logger.info('Analyzing diff with Gemini...');
+    const timestamp = new Date().toTimeString().slice(0, 8);
+    process.stdout.write(`\x1b[2m[${timestamp}]\x1b[0m \x1b[36m\x1b[1mINFO \x1b[0m Analyzing......`);
     const commitMessage = await generateCommitMessage(diff, config, safeFiles);
+    process.stdout.write('\r\x1b[K'); // clear the "Analyzing......" line
 
-    // Commit changes locally
-    try {
-      const sha = await addAndCommit(config.watchPath, safeFiles, commitMessage, config.dryRun);
-      if (!config.dryRun) {
-        logger.success(`📝 Committed locally: [${sha.slice(0, 7)}] ${commitMessage}`);
-        logger.info(`Run 'git push origin ${config.branch}' to push your changes to GitHub when ready.`);
+    logger.success(`Gemini analyzed the changes successfully!`);
+    console.log(`🤖 Proposed Commit Message: "${commitMessage}"\n`);
+
+    // Setup interactive prompt
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    let currentMessage = commitMessage;
+    let done = false;
+
+    while (!done) {
+      console.log('What would you like to do?');
+      console.log('  [1] Commit & Push to GitHub');
+      console.log('  [2] Commit locally only (no push)');
+      console.log('  [3] Edit/change the commit message');
+      console.log('  [4] Abort');
+      console.log();
+
+      const answer = await rl.question('Enter choice (1-4): ');
+      const choice = answer.trim();
+
+      if (choice === '1') {
+        rl.close();
+        done = true;
+        try {
+          // Check if remote is configured if pushing
+          await assertRemote(config.watchPath);
+          const sha = await addAndCommit(config.watchPath, safeFiles, currentMessage, config.dryRun);
+          if (!config.dryRun) {
+            logger.success(`📝 Committed: [${sha.slice(0, 7)}] ${currentMessage}`);
+            logger.info(`Pushing to origin/${config.branch}…`);
+            await pushToRemote(config.watchPath, config.branch, config.dryRun);
+          } else {
+            logger.info(`[DRY-RUN] Would commit & push: "${currentMessage}"`);
+          }
+        } catch (err) {
+          logger.error(`Failed: ${err.message}`);
+          process.exit(1);
+        }
+      } else if (choice === '2') {
+        rl.close();
+        done = true;
+        try {
+          const sha = await addAndCommit(config.watchPath, safeFiles, currentMessage, config.dryRun);
+          if (!config.dryRun) {
+            logger.success(`📝 Committed locally: [${sha.slice(0, 7)}] ${currentMessage}`);
+            logger.info(`Run 'git push origin ${config.branch}' to push manually when ready.`);
+          } else {
+            logger.info(`[DRY-RUN] Would commit locally: "${currentMessage}"`);
+          }
+        } catch (err) {
+          logger.error(`Failed: ${err.message}`);
+          process.exit(1);
+        }
+      } else if (choice === '3') {
+        const newMsg = await rl.question('\nEnter new commit message: ');
+        if (newMsg.trim()) {
+          currentMessage = newMsg.trim();
+          console.log(`\n📝 Updated Commit Message: "${currentMessage}"\n`);
+        } else {
+          console.log('\n⚠️ Message cannot be empty.\n');
+        }
+      } else if (choice === '4' || choice.toLowerCase() === 'q') {
+        rl.close();
+        done = true;
+        logger.info('Commit aborted.');
+      } else {
+        console.log('\n❌ Invalid choice. Please select 1, 2, 3, or 4.\n');
       }
-    } catch (err) {
-      logger.error(`Commit failed: ${err.message}`);
-      process.exit(1);
     }
   });
 
