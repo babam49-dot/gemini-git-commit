@@ -6,3 +6,6 @@ export { scanFiles } from './secretScan.js';
 export { generateCommitMessage, fallbackMessage, AVAILABLE_MODELS } from './gemini.js';
 export { addAndCommit, pushToRemote, getDiff, hasChanges, assertGitRepo, assertRemote } from './git.js';
 export { logger, setVerbose } from './logger.js';
+
+// Helper version export to test file watching
+export const VERSION = '1.0.0';
