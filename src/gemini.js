@@ -1,58 +1,74 @@
-// src/gemini.js — Gemini AI integration for intelligent commit messages
+// src/gemini.js — AI integration manager for Gemini & OpenAI commit message generation
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from './logger.js';
+import { generateOpenAICommitMessage, AVAILABLE_OPENAI_MODELS } from './openai.js';
 
-// ─── Available models (for `auto-git-sync model --list`) ─────────────────────
-export const AVAILABLE_MODELS = [
+// ─── Available Gemini models ─────────────────────────────────────────────────
+export const GEMINI_MODELS = [
   // ── Gemini 3.x family (latest / frontier) ──────────────────────────────────
   {
     id: 'gemini-3.5-flash',
+    provider: 'gemini',
     description: '⚡ Latest & fastest — best for agentic / coding tasks (default)',
     default: true,
   },
   {
     id: 'gemini-3.1-pro',
+    provider: 'gemini',
     description: '🧠 Most capable — complex reasoning, long context',
     default: false,
   },
   {
     id: 'gemini-3.1-flash',
+    provider: 'gemini',
     description: 'Fast 3.1 variant — balanced speed & intelligence',
     default: false,
   },
   {
     id: 'gemini-3.1-flash-lite',
+    provider: 'gemini',
     description: 'Lightest 3.x model — lowest latency, high volume',
     default: false,
   },
   // ── Gemini 2.5 family (stable / production) ────────────────────────────────
   {
     id: 'gemini-2.5-pro',
+    provider: 'gemini',
     description: 'Stable flagship — proven for production environments',
     default: false,
   },
   {
     id: 'gemini-2.5-flash',
+    provider: 'gemini',
     description: 'Stable fast variant — reliable & cost-effective',
     default: false,
   },
   {
     id: 'gemini-2.5-flash-lite',
+    provider: 'gemini',
     description: 'Lightest 2.5 model',
     default: false,
   },
   // ── Gemini 2.0 family (legacy) ─────────────────────────────────────────────
   {
     id: 'gemini-2.0-flash',
+    provider: 'gemini',
     description: 'Previous generation flash (legacy)',
     default: false,
   },
   {
     id: 'gemini-2.0-flash-lite',
+    provider: 'gemini',
     description: 'Lightest legacy variant',
     default: false,
   },
+];
+
+// Combine all supported models (Gemini + OpenAI)
+export const AVAILABLE_MODELS = [
+  ...GEMINI_MODELS,
+  ...AVAILABLE_OPENAI_MODELS,
 ];
 
 const SYSTEM_PROMPT = `You are a senior software engineer writing git commit messages.
@@ -67,26 +83,58 @@ Rules:
 - Do NOT include quotes around the message`;
 
 /**
- * Generate an AI-powered commit message from a unified diff.
+ * Generate an AI-powered commit message routing to either OpenAI or Gemini.
  *
  * @param {string} diff      - output of `git diff --staged` or similar
- * @param {object} config    - merged config (geminiApiKey, geminiModel)
+ * @param {object} config    - merged config
  * @param {string[]} files   - list of changed file paths (used for fallback)
  * @returns {Promise<string>} - commit message
  */
 export async function generateCommitMessage(diff, config, files = []) {
-  // ── Fallback: no diff or no API key ────────────────────────────────
-  if (!config.geminiApiKey) {
-    logger.debug('No GEMINI_API_KEY — using auto-generated commit message');
+  const selectedModel =
+    config.model ||
+    config.activeModel ||
+    config.geminiModel ||
+    config.openaiModel ||
+    'gemini-3.5-flash';
+
+  const isOpenAI =
+    config.aiProvider === 'openai' ||
+    selectedModel.startsWith('gpt-') ||
+    selectedModel.startsWith('o1') ||
+    selectedModel.startsWith('o3');
+
+  if (isOpenAI) {
+    return generateOpenAICommitMessage(diff, { ...config, model: selectedModel }, files);
+  }
+
+  return generateGeminiCommitMessage(diff, { ...config, model: selectedModel }, files);
+}
+
+/**
+ * Generate commit message using Gemini API.
+ */
+export async function generateGeminiCommitMessage(diff, config, files = []) {
+  const apiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+  const modelName = config.model || config.geminiModel || 'gemini-3.5-flash';
+
+  // ── Fallback: no API key ──────────────────────────────────────────────
+  if (!apiKey) {
+    logger.warn(
+      '⚠️  No GEMINI_API_KEY set.\n' +
+      '      Set it via env var: export GEMINI_API_KEY="AIza..."\n' +
+      '      or pass: auto-git-sync start --api-key="AIza..."\n' +
+      '      Get a free key at: https://aistudio.google.com/apikey'
+    );
     return fallbackMessage(files);
   }
 
   // ── API key format sanity check ───────────────────────────────────────────
-  if (!config.geminiApiKey.startsWith('AIza') && !config.geminiApiKey.startsWith('AQ')) {
+  if (!apiKey.startsWith('AIza') && !apiKey.startsWith('AQ')) {
     logger.warn(
       '⚠️  Your Gemini API key does not look like a valid key.\n' +
       '      Expected format: AIza... or AQ... \n' +
-      '      Got format: ' + config.geminiApiKey.slice(0, 10) + '...\n' +
+      '      Got format: ' + apiKey.slice(0, 10) + '...\n' +
       '      Get a free key at: https://aistudio.google.com/apikey'
     );
   }
@@ -96,7 +144,7 @@ export async function generateCommitMessage(diff, config, files = []) {
     return fallbackMessage(files);
   }
 
-  // ── Truncate very large diffs to avoid token limits ───────────────────────
+  // ── Truncate very large diffs ─────────────────────────────────────────────
   const MAX_DIFF_CHARS = 30_000;
   const truncatedDiff =
     diff.length > MAX_DIFF_CHARS
@@ -104,15 +152,13 @@ export async function generateCommitMessage(diff, config, files = []) {
       : diff;
 
   try {
-    const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: config.geminiModel || 'gemini-3.5-flash',
+      model: modelName,
       systemInstruction: SYSTEM_PROMPT,
     });
 
-    logger.debug(
-      `Calling Gemini (${config.geminiModel || 'gemini-3.5-flash'}) for commit message…`
-    );
+    logger.debug(`Calling Gemini (${modelName}) for commit message…`);
 
     const result = await model.generateContent(
       `Here is the unified diff of the changes:\n\n\`\`\`diff\n${truncatedDiff}\n\`\`\``
@@ -131,19 +177,18 @@ export async function generateCommitMessage(diff, config, files = []) {
     return message;
   } catch (err) {
     const msg = err.message || String(err);
-    // Give a more actionable error hint
     if (msg.includes('fetch failed') || msg.includes('ENOTFOUND')) {
       logger.warn(`Gemini API error (network/fetch failed) — check your internet connection`);
     } else if (msg.includes('401') || msg.includes('403') || msg.includes('API_KEY_INVALID')) {
       logger.warn(
         `Gemini API error: Invalid or unauthorized API key.\n` +
-        `      Your key: ${config.geminiApiKey.slice(0, 10)}…\n` +
+        `      Your key: ${apiKey.slice(0, 10)}…\n` +
         `      Get a valid key at: https://aistudio.google.com/apikey`
       );
     } else if (msg.includes('404') || msg.includes('not found') || msg.includes('models/')) {
       logger.warn(
-        `Gemini API error: Model "${config.geminiModel}" not found or not available for your key.\n` +
-        `      Try: auto-git-sync model --list  to see available models.`
+        `Gemini API error: Model "${modelName}" not found or not available for your key.\n` +
+        `      Run: auto-git-sync model  to view available models.`
       );
     } else {
       logger.warn(`Gemini API error (${msg}) — falling back to auto-generated message`);
@@ -153,8 +198,8 @@ export async function generateCommitMessage(diff, config, files = []) {
 }
 
 /**
- * Fallback commit message when Gemini is unavailable.
- * Format: "auto-sync: updated N files - YYYY-MM-DD HH:MM"
+ * Fallback commit message when AI is unavailable.
+ * Format: "Update filename1, filename2"
  */
 export function fallbackMessage(files = []) {
   if (files.length === 0) return 'Update project files';
@@ -169,26 +214,40 @@ export function fallbackMessage(files = []) {
 }
 
 /**
- * Print version info about the configured Gemini model.
+ * Print version info about the configured AI model.
  */
 export function printModelVersion(config) {
-  const model = config?.geminiModel || 'gemini-2.0-flash';
+  const model = config?.model || config?.geminiModel || config?.openaiModel || 'gemini-3.5-flash';
   const info = AVAILABLE_MODELS.find((m) => m.id === model);
-  console.log(`\n  Current Gemini model : ${model}`);
-  if (info) console.log(`  Description          : ${info.description}`);
-  console.log(`  Source               : @google/generative-ai SDK`);
+  const isOpenAI = info?.provider === 'openai' || model.startsWith('gpt-') || model.startsWith('o1') || model.startsWith('o3');
+
+  const apiKeySet = isOpenAI
+    ? Boolean(config?.openaiApiKey || process.env.OPENAI_API_KEY)
+    : Boolean(config?.geminiApiKey || process.env.GEMINI_API_KEY);
+
+  console.log(`\n  Current AI model  : ${model} (${isOpenAI ? 'OpenAI' : 'Gemini'})`);
+  if (info) console.log(`  Description       : ${info.description}`);
+  console.log(`  Provider          : ${isOpenAI ? 'OpenAI API' : '@google/generative-ai SDK'}`);
   console.log(
-    `  API key set          : ${config?.geminiApiKey ? '✅ yes' : '❌ no (set GEMINI_API_KEY)'}\n`
+    `  API key set       : ${apiKeySet ? '✅ yes' : `❌ no (set ${isOpenAI ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'})`}\n`
   );
 }
 
 /**
- * Print a table of all available Gemini models.
+ * Print a table of all available AI models (Gemini & OpenAI).
  */
 export function listModels() {
-  console.log('\n  Available Gemini models:\n');
-  for (const m of AVAILABLE_MODELS) {
-    const tag = m.default ? ' ← default' : '';
+  console.log('\n  Available AI models:\n');
+
+  console.log('  Google Gemini Models:');
+  for (const m of GEMINI_MODELS) {
+    const tag = m.default ? ' ← default Gemini' : '';
+    console.log(`    ${m.id.padEnd(28)} ${m.description}${tag}`);
+  }
+
+  console.log('\n  OpenAI Models:');
+  for (const m of AVAILABLE_OPENAI_MODELS) {
+    const tag = m.default ? ' ← default OpenAI' : '';
     console.log(`    ${m.id.padEnd(28)} ${m.description}${tag}`);
   }
   console.log();

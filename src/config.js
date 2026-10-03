@@ -14,12 +14,16 @@ export const DEFAULTS = {
   pushMode: 'immediate',        // 'immediate' | 'interval' | 'manual'
   pushIntervalMinutes: 10,
   ignorePatterns: [],
-  commitMessageTemplate: null,  // null = use Gemini / auto-generated
+  commitMessageTemplate: null,  // null = use Gemini / OpenAI auto-generated
   secretScan: true,
   allowSecretPatterns: [],      // regex strings to allowlist
   dryRun: false,
   verbose: false,
-  geminiModel: 'gemini-3.5-flash', // internal fallback — overridden by user's model selection
+  geminiModel: 'gemini-3.5-flash', // default Gemini model
+  openaiModel: 'gpt-4o-mini',     // default OpenAI model
+  aiProvider: 'auto',             // 'auto' | 'gemini' | 'openai'
+  geminiApiKey: null,
+  openaiApiKey: null,
 };
 
 
@@ -73,6 +77,22 @@ export function loadConfig(cwd = process.cwd(), cliFlags = {}) {
   if (!merged.geminiApiKey) {
     merged.geminiApiKey = process.env.GEMINI_API_KEY || null;
   }
+  if (!merged.openaiApiKey) {
+    merged.openaiApiKey = process.env.OPENAI_API_KEY || null;
+  }
+
+  // If a generic apiKey was passed in cliFlags, route it appropriately
+  if (cliFlags.apiKey) {
+    if (cliFlags.openaiApiKey) {
+      merged.openaiApiKey = cliFlags.openaiApiKey;
+    } else if (cliFlags.geminiApiKey) {
+      merged.geminiApiKey = cliFlags.geminiApiKey;
+    } else {
+      // Assign to both if ambiguous or route based on model
+      merged.geminiApiKey = cliFlags.apiKey;
+      merged.openaiApiKey = cliFlags.apiKey;
+    }
+  }
 
   return merged;
 }
@@ -91,8 +111,11 @@ export function defaultConfigJson() {
       secretScan: true,
       allowSecretPatterns: [],
       dryRun: false,
-      // geminiModel is saved here when you run: auto-git-sync model
-      // API key: set via GEMINI_API_KEY env var (never store it in this file)
+      // Active AI Model (e.g., 'gemini-3.5-flash' or 'gpt-4o-mini')
+      geminiModel: 'gemini-3.5-flash',
+      openaiModel: 'gpt-4o-mini',
+      // API Keys: Set via GEMINI_API_KEY or OPENAI_API_KEY environment variables
+      // Users provide their own keys; keys should never be stored publicly.
     },
     null,
     2

@@ -1,7 +1,7 @@
 {
   "name": "auto-git-sync",
   "version": "1.0.0",
-  "description": "Watch your project, auto-commit & push to GitHub with Gemini AI-powered commit messages and secret scanning.",
+  "description": "Watch your project, auto-commit & push to GitHub with Gemini or OpenAI AI-powered commit messages and secret scanning.",
   "type": "module",
   "main": "src/index.js",
   "bin": {
@@ -24,6 +24,8 @@
     "sync",
     "github",
     "gemini",
+    "openai",
+    "gpt-4o",
     "ai",
     "devtools",
     "cli"
@@ -38,6 +40,7 @@
     "chokidar": "^3.6.0",
     "commander": "^12.1.0",
     "ignore": "^5.3.2",
+    "openai": "^4.86.0",
     "simple-git": "^3.26.0"
   },
   "repository": {

@@ -1,6 +1,6 @@
 # auto-git-sync
 
-> 🤖 Watch your project folder, auto-commit with **Gemini AI**-generated commit messages, and push to GitHub — all automatically.
+> 🤖 Watch your project folder, auto-commit with **Gemini AI** or **OpenAI**-generated commit messages, and push to GitHub — all automatically.
 
 [![npm version](https://img.shields.io/npm/v/auto-git-sync?color=blue)](https://www.npmjs.com/package/auto-git-sync)
 [![Node.js](https://img.shields.io/node/v/auto-git-sync)](https://nodejs.org)
@@ -14,7 +14,9 @@
 | Feature | Details |
 |---|---|
 | 🔍 **Smart file watching** | Uses [chokidar](https://github.com/paulmillr/chokidar), respects `.gitignore`, ignores `.git` & `node_modules` |
-| 🤖 **Gemini AI commit messages** | Sends the unified diff to Gemini 2.0 Flash — gets a precise, emoji-prefixed commit message |
+| 🤖 **AI Commit Messages** | Supports **Gemini** (`gemini-3.5-flash`, `gemini-3.1-pro`) & **OpenAI** (`gpt-4o-mini`, `gpt-4o`, `o3-mini`, `o1-mini`) |
+| 🔑 **User API Keys** | Bring your own API key (`OPENAI_API_KEY` or `GEMINI_API_KEY`) — zero key leakage or shared quotas |
+| 🎯 **Interactive Model Picker** | Interactively switch between AI models with `auto-git-sync model` |
 | ⏱ **Debounce** | Batches rapid saves into one commit (configurable, default 4 s) |
 | 🔐 **Secret scanning** | Blocks `.env`, `*.pem`, AWS keys, private key blocks, and more from ever being committed |
 | 🚀 **Push strategies** | `immediate` / `interval` / `manual` — fully configurable |
@@ -49,19 +51,26 @@ npm install --save-dev auto-git-sync
 # 1. Navigate to your git project
 cd my-project
 
-# 2. Set your Gemini API key (free at https://aistudio.google.com/apikey)
+# 2. Set your API key (Users bring their own key)
+# For Gemini (free key at https://aistudio.google.com/apikey):
 export GEMINI_API_KEY="AIza..."          # macOS / Linux
 $env:GEMINI_API_KEY="AIza..."           # Windows PowerShell
-set GEMINI_API_KEY=AIza...              # Windows CMD
 
-# 3. Start watching
+# OR For OpenAI (key at https://platform.openai.com/api-keys):
+export OPENAI_API_KEY="sk-..."            # macOS / Linux
+$env:OPENAI_API_KEY="sk-..."             # Windows PowerShell
+
+# 3. Choose your preferred AI model (Gemini or OpenAI)
+auto-git-sync model
+
+# 4. Start watching
 auto-git-sync start
 ```
 
 That's it! Every time you save files, `auto-git-sync` will:
 1. Detect the changes
 2. Run a secret scan
-3. Get the diff and ask Gemini to write a commit message
+3. Analyze the diff with your selected AI model (Gemini / OpenAI) to write a commit message
 4. `git add` + `git commit` + `git push`
 
 ---
@@ -81,55 +90,37 @@ auto-git-sync start [options]
 | `--push-mode <mode>` | `immediate` \| `interval` \| `manual` | `immediate` |
 | `--push-interval <min>` | Minutes between pushes (interval mode) | `10` |
 | `--api-key <key>` | Gemini API key (alternative to env var) | — |
+| `--openai-api-key <key>` | OpenAI API key (alternative to env var) | — |
 | `--dry-run` | Preview what would happen, no git changes | `false` |
 | `--no-secret-scan` | ⚠️ Disable secret scanning | — |
 | `--verbose` | Print full debug output | `false` |
 
-**Examples:**
+---
+
+### `auto-git-sync model` — Interactively select AI Model
+
+Select any model from Gemini or OpenAI family. Saves your preference to `.autogitsyncrc.json`.
+
 ```bash
-# Commit locally only, push manually
-auto-git-sync start --push-mode manual
+# Interactive model selector
+auto-git-sync model
 
-# Batch pushes every 5 minutes
-auto-git-sync start --push-mode interval --push-interval 5
-
-# Test without making real commits
-auto-git-sync start --dry-run --verbose
-
-# Slower debounce for big projects
-auto-git-sync start --debounce 8000
+# List all supported models (non-interactive)
+auto-git-sync model --list
 ```
+
+**Supported Models:**
+- **Google Gemini**: `gemini-3.5-flash` (default), `gemini-3.1-pro`, `gemini-3.1-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.0-flash`
+- **OpenAI**: `gpt-4o-mini` (default OpenAI), `gpt-4o`, `o3-mini`, `o1-mini`, `gpt-4-turbo`, `gpt-3.5-turbo`
 
 ---
 
-### `auto-git-sync commit` — Interactive Gemini Commit (Manual)
+### `auto-git-sync commit` — Interactive Commit (Manual)
 
-If you do not want to automatically track, commit, and push files in the background, you can run this command on demand. It will stage all your changes, print a dynamic `Analyzing......` indicator, call Gemini to generate a message, and present you with an interactive selection menu:
+If you do not want background watching, run this on demand to stage changes, analyze diffs with AI, and pick actions interactively:
 
 ```bash
 auto-git-sync commit [options]
-```
-
-#### Interactive Menu Options:
-1. **Commit & Push to GitHub**: Stages, commits locally using the proposed/edited message, and pushes to your configured branch.
-2. **Commit locally only**: Stages and commits locally without pushing to GitHub.
-3. **Edit/change the commit message**: Lets you input a custom commit message before committing.
-4. **Abort**: Cancels the staging and exit.
-
-| Flag | Description |
-|---|---|
-| `--api-key <key>` | Gemini API key (alternative to env var) |
-| `--no-secret-scan` | Disable pre-commit secret safety scanning |
-| `--dry-run` | Preview the generated commit message without making any commit |
-| `--verbose` | Print full debug output |
-
-**Example:**
-```bash
-# Start the interactive commit flow
-auto-git-sync commit
-
-# Preview the generated message
-auto-git-sync commit --dry-run
 ```
 
 ---
@@ -143,36 +134,6 @@ auto-git-sync init --force   # overwrite existing
 
 Creates a `.autogitsyncrc.json` in the current directory with all options.
 
----
-
-### `auto-git-sync model` — Gemini model info
-
-```bash
-# Show current model and API key status
-auto-git-sync model --show-version
-
-# List all available models
-auto-git-sync model --list
-```
-
-**Output example:**
-```
-  Current Gemini model : gemini-3.5-flash
-  Description          : ⚡ Latest & fastest — best for agentic / coding tasks (default)
-  API key set          : ✅ yes
-
-  Available Gemini models:
-
-    gemini-3.5-flash             ⚡ Latest & fastest — best for agentic / coding tasks (default) ← default
-    gemini-3.1-pro               🧠 Most capable — complex reasoning, long context
-    gemini-3.1-flash             Fast 3.1 variant — balanced speed & intelligence
-    gemini-3.1-flash-lite        Lightest 3.x model — lowest latency, high volume
-    gemini-2.5-pro               Stable flagship — proven for production environments
-    gemini-2.5-flash             Stable fast variant — reliable & cost-effective
-    gemini-2.5-flash-lite        Lightest 2.5 model
-    gemini-2.0-flash             Previous generation flash (legacy)
-    gemini-2.0-flash-lite        Lightest legacy variant
-```
 
 ---
 

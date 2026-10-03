@@ -35,9 +35,11 @@ export async function startWatcher(config) {
   logger.banner(`auto-git-sync v${getVersion()} — Watching ${watchPath}`);
   logger.info(`Push mode    : ${pushMode}`);
   logger.info(`Debounce     : ${debounceMs}ms`);
-  logger.info(`Branch       : ${branch}`);
-  logger.info(`Secret scan  : ${secretScan ? 'enabled' : 'DISABLED ⚠️'}`);
-  logger.info(`Gemini AI    : ${geminiApiKey ? `enabled (${config.geminiModel})` : 'disabled (no API key)'}`);
+  const activeModel = config.model || config.geminiModel || config.openaiModel || 'gemini-3.5-flash';
+  const isOpenAI = config.aiProvider === 'openai' || activeModel.startsWith('gpt-') || activeModel.startsWith('o1') || activeModel.startsWith('o3');
+  const apiKeySet = isOpenAI ? Boolean(config.openaiApiKey || process.env.OPENAI_API_KEY) : Boolean(config.geminiApiKey || process.env.GEMINI_API_KEY);
+
+  logger.info(`AI Model     : ${activeModel} (${isOpenAI ? 'OpenAI' : 'Gemini'}) — ${apiKeySet ? 'enabled' : 'disabled (no API key)'}`);
   if (dryRun) logger.warn('DRY-RUN mode — no actual commits or pushes will occur');
   logger.divider();
 

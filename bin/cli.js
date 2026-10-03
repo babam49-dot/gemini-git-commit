@@ -48,6 +48,7 @@ program
   .option('--no-secret-scan',      'Disable secret scanning (prints a loud warning)')
   .option('--verbose',             'Enable verbose/debug output')
   .option('--api-key <key>',       'Gemini API key (alternative to GEMINI_API_KEY env var)')
+  .option('--openai-api-key <key>','OpenAI API key (alternative to OPENAI_API_KEY env var)')
   .action(async (opts) => {
     // Resolve verbose first so all subsequent logs respect it
     const verbose = opts.verbose ?? false;
@@ -63,6 +64,7 @@ program
       secretScan:           opts.secretScan      ?? true,   // Commander flips --no-* to false
       verbose,
       geminiApiKey:         opts.apiKey,
+      openaiApiKey:         opts.openaiApiKey,
     };
 
     const config = loadConfig(process.cwd(), cliFlags);
@@ -111,8 +113,9 @@ program
 // ══════════════════════════════════════════════════════════════════════════════
 program
   .command('commit')
-  .description('Track changes, scan for secrets, analyze diff with Gemini, and commit locally (no automatic push)')
+  .description('Track changes, scan for secrets, analyze diff with AI, and commit locally (no automatic push)')
   .option('--api-key <key>',       'Gemini API key (alternative to GEMINI_API_KEY env var)')
+  .option('--openai-api-key <key>','OpenAI API key (alternative to OPENAI_API_KEY env var)')
   .option('--no-secret-scan',      'Disable secret scanning')
   .option('--dry-run',             'Log what would happen without making any actual commit')
   .option('--verbose',             'Enable verbose/debug output')
@@ -125,6 +128,7 @@ program
       dryRun:               opts.dryRun ?? false,
       verbose,
       geminiApiKey:         opts.apiKey,
+      openaiApiKey:         opts.openaiApiKey,
     };
 
     const config = loadConfig(process.cwd(), cliFlags);
@@ -165,16 +169,16 @@ program
       }
     }
 
-    // Get unified diff for Gemini
+    // Get unified diff for AI
     const diff = await getDiff(config.watchPath, safeFiles);
 
-    // Generate commit message using Gemini
+    // Generate commit message using AI (Gemini or OpenAI)
     const timestamp = new Date().toTimeString().slice(0, 8);
-    process.stdout.write(`\x1b[2m[${timestamp}]\x1b[0m \x1b[36m\x1b[1mINFO \x1b[0m Analyzing......`);
+    process.stdout.write(`\x1b[2m[${timestamp}]\x1b[0m \x1b[36m\x1b[1mINFO \x1b[0m Analyzing diff with AI......`);
     const commitMessage = await generateCommitMessage(diff, config, safeFiles);
-    process.stdout.write('\r\x1b[K'); // clear the "Analyzing......" line
+    process.stdout.write('\r\x1b[K'); // clear line
 
-    logger.success(`Gemini analyzed the changes successfully!`);
+    logger.success(`AI analyzed the changes successfully!`);
     console.log(`🤖 Proposed Commit Message: "${commitMessage}"\n`);
 
     // Setup interactive prompt
@@ -267,9 +271,12 @@ program
     logger.success(`Created ${configPath}`);
     console.log(`
   📄  Next steps:
-      1. Edit ${CONFIG_FILENAME} to set your branch, pushMode, Gemini API key, etc.
-      2. Set your API key:  export GEMINI_API_KEY="your-key-here"
-      3. Start watching:    auto-git-sync start
+      1. Edit ${CONFIG_FILENAME} to set your branch, pushMode, AI model, etc.
+      2. Set your API key:
+         Gemini: export GEMINI_API_KEY="AIza..."
+         OpenAI: export OPENAI_API_KEY="sk-..."
+      3. Select model:      auto-git-sync model
+      4. Start watching:    auto-git-sync start
 `);
   });
 
@@ -278,7 +285,7 @@ program
 // ══════════════════════════════════════════════════════════════════════════════
 program
   .command('model')
-  .description('Interactively select a Gemini model to use for commit messages')
+  .description('Interactively select an AI model (Gemini or OpenAI) to use for commit messages')
   .option('--list', 'Just list available models (non-interactive)')
   .action(async (opts) => {
     const config = loadConfig(process.cwd(), {});
@@ -292,27 +299,33 @@ program
     const RESET  = '\x1b[0m';
 
     // ── Current state ─────────────────────────────────────────────────────────
-    const currentModel = config.geminiModel;
-    const apiKey       = process.env.GEMINI_API_KEY || config.geminiApiKey || null;
+    const currentModel = config.model || config.geminiModel || config.openaiModel || 'gemini-3.5-flash';
+    const geminiKey    = process.env.GEMINI_API_KEY || config.geminiApiKey || null;
+    const openaiKey    = process.env.OPENAI_API_KEY || config.openaiApiKey || null;
 
     console.log();
-    console.log(`${BOLD}  Gemini Model Selector${RESET}`);
-    console.log(`  ${'─'.repeat(50)}`);
-    console.log(`  API Key : ${apiKey
-      ? `${GREEN}✅ Set via GEMINI_API_KEY env var${RESET}`
-      : `${YELLOW}⚠️  Not set — run: export GEMINI_API_KEY="AIza..."${RESET}`
+    console.log(`${BOLD}  AI Model Selector (Gemini & OpenAI)${RESET}`);
+    console.log(`  ${'─'.repeat(55)}`);
+    console.log(`  Gemini Key : ${geminiKey
+      ? `${GREEN}✅ Set via GEMINI_API_KEY env var / config${RESET}`
+      : `${YELLOW}⚠️  Not set (export GEMINI_API_KEY="AIza...")${RESET}`
     }`);
-    console.log(`  Active  : ${CYAN}${BOLD}${currentModel}${RESET}`);
+    console.log(`  OpenAI Key : ${openaiKey
+      ? `${GREEN}✅ Set via OPENAI_API_KEY env var / config${RESET}`
+      : `${YELLOW}⚠️  Not set (export OPENAI_API_KEY="sk-...")${RESET}`
+    }`);
+    console.log(`  Active     : ${CYAN}${BOLD}${currentModel}${RESET}`);
     console.log();
 
     // ── Model list ────────────────────────────────────────────────────────────
-    console.log(`${BOLD}  Available Gemini models:${RESET}`);
+    console.log(`${BOLD}  Available AI models:${RESET}`);
     console.log();
     AVAILABLE_MODELS.forEach((m, i) => {
-      const num    = `${DIM}[${i + 1}]${RESET}`;
+      const num    = `${DIM}[${String(i + 1).padStart(2)}]${RESET}`;
       const active = m.id === currentModel ? ` ${GREEN}← active${RESET}` : '';
       const name   = `${BLUE}${BOLD}${m.id}${RESET}`;
-      console.log(`    ${num} ${name}${' '.repeat(Math.max(1, 34 - m.id.length))}${DIM}${m.description}${RESET}${active}`);
+      const provider = `${DIM}(${m.provider})${RESET}`;
+      console.log(`    ${num} ${name}${' '.repeat(Math.max(1, 26 - m.id.length))} ${provider} ${m.description}${active}`);
     });
     console.log();
 
@@ -352,10 +365,13 @@ program
     }
 
     fileConfig.geminiModel = selected.id;
+    fileConfig.openaiModel = selected.id;
+    fileConfig.aiProvider  = selected.provider;
+
     fs.writeFileSync(configPath, JSON.stringify(fileConfig, null, 2) + '\n', 'utf8');
 
     console.log();
-    console.log(`  ${GREEN}✅ Model updated:${RESET} ${CYAN}${BOLD}${selected.id}${RESET}`);
+    console.log(`  ${GREEN}✅ Model updated:${RESET} ${CYAN}${BOLD}${selected.id}${RESET} (${selected.provider})`);
     console.log(`  ${DIM}Saved to ${CONFIG_FILENAME}${RESET}`);
     console.log(`  ${DIM}To switch again at any time, run: auto-git-sync model${RESET}`);
     console.log();
@@ -387,16 +403,22 @@ program
     auto-git-sync --version
     auto-git-sync -v
 
-  ─── Gemini model check ──────────────────────────────────────────
-    auto-git-sync model --version
+  ─── AI model check & selection (Gemini / OpenAI) ───────────────
+    auto-git-sync model
     auto-git-sync model --list
 
-  ─── Set up Gemini API key ───────────────────────────────────────
-    export GEMINI_API_KEY="your-key-here"          # macOS/Linux
-    set GEMINI_API_KEY=your-key-here               # Windows CMD
-    $env:GEMINI_API_KEY="your-key-here"            # Windows PowerShell
+  ─── Set up API keys (Provide your own API Key) ──────────────────
+    For Gemini:
+      export GEMINI_API_KEY="AIza..."               # macOS/Linux
+      $env:GEMINI_API_KEY="AIza..."                # Windows PowerShell
+      set GEMINI_API_KEY=AIza...                   # Windows CMD
+      Get key: https://aistudio.google.com/apikey
 
-    Get a free key at: https://aistudio.google.com/apikey
+    For OpenAI:
+      export OPENAI_API_KEY="sk-..."               # macOS/Linux
+      $env:OPENAI_API_KEY="sk-..."                # Windows PowerShell
+      set OPENAI_API_KEY=sk-...                   # Windows CMD
+      Get key: https://platform.openai.com/api-keys
 
   ─── Common usage ────────────────────────────────────────────────
     auto-git-sync init                # create .autogitsyncrc.json
@@ -417,12 +439,16 @@ program
   .command('status')
   .description('Show current configuration that would be used')
   .option('--api-key <key>', 'Gemini API key')
+  .option('--openai-api-key <key>', 'OpenAI API key')
   .action((opts) => {
-    const config = loadConfig(process.cwd(), { geminiApiKey: opts.apiKey });
+    const config = loadConfig(process.cwd(), { geminiApiKey: opts.apiKey, openaiApiKey: opts.openaiApiKey });
     console.log('\n  Current auto-git-sync configuration:\n');
     const display = { ...config };
     if (display.geminiApiKey) {
       display.geminiApiKey = display.geminiApiKey.slice(0, 8) + '…(redacted)';
+    }
+    if (display.openaiApiKey) {
+      display.openaiApiKey = display.openaiApiKey.slice(0, 8) + '…(redacted)';
     }
     console.log(JSON.stringify(display, null, 4));
     console.log();

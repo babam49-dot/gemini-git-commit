@@ -3,10 +3,9 @@
 export { startWatcher } from './watcher.js';
 export { loadConfig, DEFAULTS, CONFIG_FILENAME } from './config.js';
 export { scanFiles } from './secretScan.js';
-export { generateCommitMessage, fallbackMessage, AVAILABLE_MODELS } from './gemini.js';
+export { generateCommitMessage, fallbackMessage, AVAILABLE_MODELS, GEMINI_MODELS } from './gemini.js';
+export { generateOpenAICommitMessage, AVAILABLE_OPENAI_MODELS } from './openai.js';
 export { addAndCommit, pushToRemote, getDiff, hasChanges, assertGitRepo, assertRemote, getChangedFiles } from './git.js';
 export { logger, setVerbose } from './logger.js';
 
-// Helper version export to test file watching
 export const VERSION = '1.0.0';
-// Testing interactive commit subcommand
