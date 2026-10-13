@@ -1,13 +1,15 @@
 // src/openai.js — OpenAI API integration for commit message generation
 
 import { logger } from './logger.js';
-import { fallbackMessage } from './gemini.js';
+import { fallbackMessage, sanitizeCommitMessage } from './gemini.js';
 
 export const SYSTEM_PROMPT = `You are a senior software engineer writing git commit messages.
-Given a unified diff of file changes, produce a single concise and highly descriptive commit message summarizing the exact change.
+Given a unified diff of file changes, produce a single concise and highly descriptive commit message summarizing the exact change as if written directly by the developer themself.
 
 Rules:
-- Do NOT use any emojis, labels, or prefixes (e.g. do NOT output "feat:", "fix:", "✨", etc.)
+- Strictly ignore and do NOT use any emojis, symbols, or emoji shortcodes (e.g. do NOT output "✨", "🐛", ":sparkles:", etc.)
+- Do NOT use commit type prefixes, labels, or tags (e.g. do NOT output "feat:", "fix:", "chore:", etc.)
+- Write in a natural, self-written human developer style
 - Start with a capital letter and write a clear, natural English sentence/phrase
 - Be specific and descriptive of what was changed and why (e.g. "Bypass local CORS errors in app.js contact form by mocking API responses" or "Reduce mobile hero name size to 8.5vw to prevent Y clipping")
 - Keep the message concise (aim for under 72 characters) but prioritize clarity and descriptiveness
@@ -144,11 +146,8 @@ export async function generateOpenAICommitMessage(diff, config, files = []) {
 
     if (!rawText) throw new Error('Empty response from OpenAI');
 
-    // Sanitise: take first line, strip quotes
-    const message = rawText
-      .split('\n')[0]
-      .replace(/^["']|["']$/g, '')
-      .trim();
+    // Sanitise: strip emojis, prefixes, surrounding quotes, and ensure capitalisation
+    const message = sanitizeCommitMessage(rawText);
 
     logger.debug(`OpenAI commit message: "${message}"`);
     return message;
