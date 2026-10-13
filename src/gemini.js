@@ -71,11 +71,13 @@ export const AVAILABLE_MODELS = [
   ...AVAILABLE_OPENAI_MODELS,
 ];
 
-const SYSTEM_PROMPT = `You are a senior software engineer writing git commit messages.
-Given a unified diff of file changes, produce a single concise and highly descriptive commit message summarizing the exact change.
+export const SYSTEM_PROMPT = `You are a senior software engineer writing git commit messages.
+Given a unified diff of file changes, produce a single concise and highly descriptive commit message summarizing the exact change as if written directly by the developer themself.
 
 Rules:
-- Do NOT use any emojis, labels, or prefixes (e.g. do NOT output "feat:", "fix:", "✨", etc.)
+- Strictly ignore and do NOT use any emojis, symbols, or emoji shortcodes (e.g. do NOT output "✨", "🐛", ":sparkles:", etc.)
+- Do NOT use commit type prefixes, labels, or tags (e.g. do NOT output "feat:", "fix:", "chore:", etc.)
+- Write in a natural, self-written human developer style
 - Start with a capital letter and write a clear, natural English sentence/phrase
 - Be specific and descriptive of what was changed and why (e.g. "Bypass local CORS errors in app.js contact form by mocking API responses" or "Reduce mobile hero name size to 8.5vw to prevent Y clipping")
 - Keep the message concise (aim for under 72 characters) but prioritize clarity and descriptiveness
@@ -83,9 +85,43 @@ Rules:
 - Do NOT include quotes around the message`;
 
 /**
+ * Strip emojis, emoji shortcodes, conventional commit prefixes, and surrounding quotes.
+ * Ensures the commit message looks natural, clean, and self-written.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function sanitizeCommitMessage(text) {
+  if (!text) return '';
+  let msg = text.split('\n')[0].replace(/^["'`]|["'`]$/g, '').trim();
+
+  // Strip unicode emojis & pictographic symbols
+  msg = msg.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F\u200D]/gu, '');
+
+  // Strip emoji shortcodes like :sparkles:, :bug:, etc.
+  msg = msg.replace(/:[a-zA-Z0-9_+-]+:/g, '');
+
+  // Clean leading spaces
+  msg = msg.trim();
+
+  // Strip leading conventional commit prefixes like "feat:", "fix:", "chore(ui):", etc.
+  msg = msg.replace(/^(feat|fix|chore|docs|style|refactor|perf|test|build|ci)(\([a-zA-Z0-9_-]+\))?:\s*/i, '');
+
+  // Collapse spaces and trim
+  msg = msg.replace(/\s+/g, ' ').trim();
+
+  // Ensure first character is uppercase
+  if (msg.length > 0) {
+    msg = msg.charAt(0).toUpperCase() + msg.slice(1);
+  }
+
+  return msg;
+}
+
+/**
  * Generate an AI-powered commit message routing to either OpenAI or Gemini.
  *
- * @param {string} diff      - output of `git diff --staged` or similar
+ * @param {string} diff      - output of \`git diff --staged\` or similar
  * @param {object} config    - merged config
  * @param {string[]} files   - list of changed file paths (used for fallback)
  * @returns {Promise<string>} - commit message
@@ -167,11 +203,8 @@ export async function generateGeminiCommitMessage(diff, config, files = []) {
     const text = result.response.text().trim();
     if (!text) throw new Error('Empty response from Gemini');
 
-    // Sanitise: take only first line, strip surrounding quotes
-    const message = text
-      .split('\n')[0]
-      .replace(/^["']|["']$/g, '')
-      .trim();
+    // Sanitise: strip emojis, prefixes, surrounding quotes, and ensure capitalisation
+    const message = sanitizeCommitMessage(text);
 
     logger.debug(`Gemini commit message: "${message}"`);
     return message;
